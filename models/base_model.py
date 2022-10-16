@@ -1,90 +1,83 @@
 #!/usr/bin/python3
-"""This is the base model class for AirBnB"""
-import models
-from datetime import datetime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, String, DateTime
-from os import environ
+"""This module defines a base class for all models in our hbnb clone"""
 import uuid
+from datetime import datetime
+import models
 
-Base = declarative_base()
+from sqlalchemy import Column, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
 
-s = "HBNB_TYPE_STORAGE"
+if models.is_db == "db":
+    Base = declarative_base()
+else:
+    Base = object
+
+
 class BaseModel:
-    """This class will defines all common attributes/methods
-    for other classes
-    """
-    if s in environ.keys() and environ["HBNB_TYPE_STORAGE"] == "db":
-        id = Column(
-            String(60),
-            unique=True,
-            nullable=False,
-            primary_key=True,
-            default=str(
-                uuid.uuid4()))
-        created_at = Column(
-            DateTime,
-            nullable=False,
-            default=datetime.utcnow())
-        updated_at = Column(
-            DateTime,
-            nullable=False,
-            default=datetime.utcnow())
+    """ Base model class """
+    if models.is_db == "db":
+        id = Column(String(60), primary_key=True, nullable=False)
+        created_at = Column(DateTime, default=datetime.utcnow())
+        updated_at = Column(DateTime, default=datetime.utcnow())
 
+    """A base class for all hbnb models"""
     def __init__(self, *args, **kwargs):
-        '''
-        Instantiation of base model class
-        '''
-        cs = "HBNB_TYPE_STORAGE"
-        if kwargs:
+        """Instatntiates a new model"""
+        if not kwargs:
             self.id = str(uuid.uuid4())
-            self.created_at = self.updated_at = datetime.now()
-            for key, value in kwargs.items():
-                if key == "created_at" or key == "updated_at":
-                    value = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
-                if key != "__class__":
-                    setattr(self, key, value)
-        elif cs not in environ.keys() or environ["HBNB_TYPE_STORAGE"] != "db":
-            self.id = str(uuid.uuid4())
-            self.created_at = self.updated_at = datetime.now()
-            models.storage.new(self)
+            self.created_at = datetime.now()
+            self.updated_at = datetime.now()
         else:
-            self.id = str(uuid.uuid4())
+            fmt = '%Y-%m-%dT%H:%M:%S.%f'
+
+            if 'id' not in kwargs:
+                kwargs['id'] = str(uuid.uuid4())
+            if 'updated_at' not in kwargs:
+                kwargs['updated_at'] = datetime.now()
+            else:
+                kwargs['updated_at'] = datetime\
+                                        .strptime(kwargs['updated_at'], fmt)
+            if 'created_at' not in kwargs:
+                kwargs['created_at'] = datetime.now()
+            else:
+                kwargs['created_at'] = datetime\
+                                        .strptime(kwargs['created_at'], fmt)
+            if '__class__' in kwargs:
+                del kwargs['__class__']
+            self.__dict__.update(kwargs)
 
     def __str__(self):
-        '''
-        returns a string
-        '''
-        return "[{}] ({}) {}".format(
-            type(self).__name__, self.id, self.__dict__)
-
-    def __repr__(self):
-        '''
-        representaion
-        '''
-        return self.__str__()
+        """Returns a string representation of the instance"""
+        cls = (str(type(self)).split('.')[-1]).split('\'')[0]
+        return '[{}] ({}) {}'.format(cls, self.id, self.__dict__)
 
     def save(self):
-        '''
-        updates updated_at to current
-        '''
+        """Updates updated_at with current time when instance is changed"""
         self.updated_at = datetime.now()
         models.storage.new(self)
         models.storage.save()
 
     def to_dict(self):
-        '''
-        creates dictionary of the class
-        '''
-        my_dict = dict(self.__dict__)
-        my_dict["__class__"] = str(type(self).__name__)
-        my_dict["created_at"] = self.created_at.isoformat()
-        my_dict["updated_at"] = self.updated_at.isoformat()
-        if "_sa_instance_state" in my_dict.keys():
-            del my_dict["_sa_instance_state"]
-            models.storage.save()
-        return my_dict
+        """Convert instance into dict format"""
+        # n_dict = self.__dict__.copy()
+        # if "created_at" in n_dict:
+        #     n_dict["created_at"] = n_dict["created_at"].strftime(dtm)
+        # if "updated_at" in n_dict:
+        #     n_dict["updated_at"] = n_dict["updated_at"].strftime(dtm)
+        # n_dict["__class__"] = self.__class__.__name__
+        # if "_sa_instance_state" in n_dict:
+        #     del n_dict["_sa_instance_state"]
+        # return n_dict
+        dictionary = {}
+        dictionary.update(self.__dict__)
+        dictionary.update({'__class__':
+                          (str(type(self)).split('.')[-1]).split('\'')[0]})
+        dictionary['created_at'] = self.created_at.isoformat()
+        dictionary['updated_at'] = self.updated_at.isoformat()
+        if "_sa_instance_state" in dictionary:
+            del dictionary["_sa_instance_state"]
+        return dictionary
 
     def delete(self):
+        """delete the current instance from the storage"""
         models.storage.delete(self)
-        models.storage.save()

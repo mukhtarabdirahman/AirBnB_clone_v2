@@ -1,67 +1,150 @@
 #!/usr/bin/python3
-"""test for amenity"""
-import unittest
-import os
-from models.amenity import Amenity
+"""Base model test"""
+from datetime import datetime
+import inspect
+import models
+import pep8 as pycodestyle
 from models.base_model import BaseModel
-import pep8
+from models.engine.db_storage import DBStorage
+import time
+import unittest
+from unittest import mock
+Model = models.amenity.Amenity
+Amenity = models.amenity.Amenity
+module_doc = models.amenity.__doc__
+path1 = "models/amenity.py"
+path2 = "tests/test_models/test_amenity.py"
 
 
-class TestAmenity(unittest.TestCase):
-    """this will test the Amenity class"""
+class DocsTest(unittest.TestCase):
+    """Test to check behaviors"""
 
     @classmethod
-    def setUpClass(cls):
-        """set up for test"""
-        cls.amenity = Amenity()
-        cls.amenity.name = "Breakfast"
+    def setUpClass(self):
+        """setting up tests"""
+        self.self_funcs = inspect.getmembers(Model, inspect.isfunction)
 
-    @classmethod
-    def teardown(cls):
-        """at the end of the test this will tear it down"""
-        del cls.amenity
+    def test_pep8(self):
+        """Testing pep8"""
+        for path in [path1,
+                     path2]:
+            with self.subTest(path=path):
+                errors = pycodestyle.Checker(path).check_all()
+                self.assertEqual(errors, 0)
 
-    def tearDown(self):
-        """teardown"""
-        try:
-            os.remove("file.json")
-        except Exception:
-            pass
+    def test_module_docstring(self):
+        """Test module docstring"""
+        self.assertIsNot(module_doc, None,
+                         "amenity.py needs a docstring")
+        self.assertTrue(len(module_doc) > 1,
+                        "test_amenity.py needs a docstring")
 
-    def test_pep8_Amenity(self):
-        """Tests pep8 style"""
-        style = pep8.StyleGuide(quiet=True)
-        p = style.check_files(['models/amenity.py'])
-        self.assertEqual(p.total_errors, 0, "fix pep8")
+        """Test classes doctring"""
+        self.assertIsNot(BaseModel.__doc__, None,
+                         "Amenity class needs a docstring")
+        self.assertTrue(len(BaseModel.__doc__) >= 1,
+                        "Amenity class needs a docstring")
 
-    def test_checking_for_docstring_Amenity(self):
-        """checking for docstrings"""
-        self.assertIsNotNone(Amenity.__doc__)
-
-    def test_attributes_Amenity(self):
-        """chekcing if amenity have attibutes"""
-        self.assertTrue('id' in self.amenity.__dict__)
-        self.assertTrue('created_at' in self.amenity.__dict__)
-        self.assertTrue('updated_at' in self.amenity.__dict__)
-        self.assertTrue('name' in self.amenity.__dict__)
-
-    def test_is_subclass_Amenity(self):
-        """test if Amenity is subclass of Basemodel"""
-        self.assertTrue(issubclass(self.amenity.__class__, BaseModel), True)
-
-    def test_attribute_types_Amenity(self):
-        """test attribute type for Amenity"""
-        self.assertEqual(type(self.amenity.name), str)
-
-    def test_save_Amenity(self):
-        """test if the save works"""
-        self.amenity.save()
-        self.assertNotEqual(self.amenity.created_at, self.amenity.updated_at)
-
-    def test_to_dict_Amenity(self):
-        """test if dictionary works"""
-        self.assertEqual('to_dict' in dir(self.amenity), True)
+    def test_func_docstrings(self):
+        """test func dostrings"""
+        for func in self.self_funcs:
+            with self.subTest(function=func):
+                self.assertIsNot(
+                    func[1].__doc__,
+                    None,
+                    "{:s} method needs a docstring".format(func[0])
+                )
+                self.assertTrue(
+                    len(func[1].__doc__) > 1,
+                    "{:s} method needs a docstring".format(func[0])
+                )
 
 
-if __name__ == "__main__":
-    unittest.main()
+@unittest.skipIf(type(models.storage) == DBStorage, "Testing DBStorage")
+class TestModelClass(unittest.TestCase):
+    """testing BaseModel Class"""
+    @mock.patch('models.amenity')
+    def test_instances(self, mock_storage):
+        """Testing that object is correctly created"""
+        instance = Amenity()
+        self.assertIs(type(instance), Amenity)
+        instance.name = "Holbies foravaaaa"
+        instance.state_id = "111-222"
+
+        expectec_attrs_types = {
+            "id": str,
+            "created_at": datetime,
+            "updated_at": datetime,
+            "state_id": str,
+            "name": str
+        }
+        # testing types and attr names
+        for attr, types in expectec_attrs_types.items():
+            with self.subTest(attr=attr, typ=types):
+                self.assertIn(attr, instance.__dict__)
+                self.assertIs(type(instance.__dict__[attr]), types)
+        self.assertEqual(instance.name, "Holbies foravaaaa")
+        self.assertEqual(instance.state_id, "111-222")
+
+    def test_datetime(self):
+        """testing correct datetime assignation
+        correct assignation of created_at and updated_at"""
+        created_at = datetime.now()
+        instance1 = Amenity()
+        updated_at = datetime.now()
+        self.assertEqual(created_at <= instance1.created_at <=
+                         updated_at, True)
+        time.sleep(0.1)
+        created_at = datetime.now()
+        instance2 = Amenity()
+        updated_at = datetime.now()
+        self.assertTrue(created_at <= instance2.created_at <= updated_at, True)
+        self.assertEqual(instance1.created_at, instance1.created_at)
+        self.assertEqual(instance2.updated_at, instance2.updated_at)
+        self.assertNotEqual(instance1.created_at, instance2.created_at)
+        self.assertNotEqual(instance1.updated_at, instance2.updated_at)
+
+    def test_uuid(self):
+        """testing uuid"""
+        instance1 = Amenity()
+        instance2 = Amenity()
+        for instance in [instance1, instance2]:
+            tuuid = instance.id
+            with self.subTest(uuid=tuuid):
+                self.assertIs(type(tuuid), str)
+
+    def test_dictionary(self):
+        """testing to_dict correct funtionality"""
+        """Testing that object is correctly created"""
+        instance3 = Amenity()
+        self.assertIs(type(instance3), Amenity)
+        instance3.name = "Holbies foravaaaa"
+        new_inst = instance3.to_dict()
+        expectec_attrs = ["id",
+                          "created_at",
+                          "updated_at",
+                          "name",
+                          "__class__"]
+        self.assertCountEqual(new_inst.keys(), expectec_attrs)
+        self.assertEqual(new_inst['__class__'], 'Amenity')
+        self.assertEqual(new_inst['name'], 'Holbies foravaaaa')
+
+    def test_str_method(self):
+        """testing str method, checking output"""
+        instance4 = Amenity()
+        strr = "[Amenity] ({}) {}".format(instance4.id, instance4.__dict__)
+        self.assertEqual(strr, str(instance4))
+
+    @mock.patch('models.storage')
+    def test_save_method(self, mock_storage):
+        """test save method and if it updates
+        "updated_at" calling storage.save"""
+        instance4 = Amenity()
+        created_at = instance4.created_at
+        updated_at = instance4.updated_at
+        instance4.save()
+        new_created_at = instance4.created_at
+        new_updated_at = instance4.updated_at
+        self.assertNotEqual(updated_at, new_updated_at)
+        self.assertEqual(created_at, new_created_at)
+        self.assertTrue(mock_storage.save.called)
